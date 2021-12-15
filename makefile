@@ -49,6 +49,7 @@ TARGET=CYW920819EVB-02
 SUPPORTED_TARGETS = \
   CYW920819EVB-02 \
   CYBT-213043-MESH \
+  CYBLE-343072-MESH \
   CYBT-243053-EVAL \
   CYBT-253059-EVAL \
   CYBT-223058-EVAL \
@@ -65,7 +66,8 @@ SUPPORTED_TARGETS = \
   CYW920721B2EVK-02 \
   CYW920719B2Q40EVB-01 \
   CYW920721M2EVK-01 \
-  CYW920721M2EVK-02
+  CYW920721M2EVK-02 \
+  CYW920721M2EVB-03
 
 #
 # Advanced Configuration
@@ -108,8 +110,10 @@ CY_APP_DEFINES += -DREMOTE_PROVISION_SERVER_SUPPORTED
 endif
 
 # value of the LOW_POWER_NODE defines mode. It can be normal node (0), or low power node (1)
+ifeq ($(filter $(TARGET), CYBLE-343072-MESH),)
 LOW_POWER_NODE ?= 0
 CY_APP_DEFINES += -DLOW_POWER_NODE=$(LOW_POWER_NODE)
+endif
 
 # If PTS is defined then device gets hardcoded BD address from make target
 # Otherwise it is random for all mesh apps.

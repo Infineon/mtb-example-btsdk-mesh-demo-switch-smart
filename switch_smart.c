@@ -70,6 +70,9 @@
 #include "e93196.h"
 #include "wiced_sleep.h"
 #include "wiced_bt_cfg.h"
+#if defined (CYBT_213043_MESH) || defined (CYBLE_343072_MESH)
+#include "GeneratedSource/cycfg_pins.h"
+#endif
 extern wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
 
 /******************************************************
@@ -99,8 +102,13 @@ extern wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
  ******************************************************/
 e93196_usr_cfg_t e93196_usr_cfg =
 {
+#if defined (CYBT_213043_MESH) || defined (CYBLE_343072_MESH)
+    .doci_pin           = CYBSP_INT_DOCI,                           /* Interrupt/Data output Clock input configure pin          */
+    .serin_pin          = CYBSP_SERIN,                              /* Serial Input configure pin                               */
+#else
     .doci_pin           = WICED_P05,                                /* Interrupt/Data output Clock input configure pin          */
     .serin_pin          = WICED_P17,                                /* Serial Input configure pin                               */
+#endif
     .e93196_init_reg    =
     {
         .sensitivity    = 0x10,                                     /* [24:17]sensitivity,   [Register Value] * 6.5uV           */
@@ -167,6 +175,10 @@ wiced_bool_t  presence_detected = WICED_FALSE;
 
 // We define optional setting for the motion sensor, the Motion Threshold. Default is 80%.
 uint8_t       mesh_motion_sensor_threshold_val = 0x50;
+
+#if defined(LOW_POWER_NODE) && (LOW_POWER_NODE == 1)
+uint32_t mesh_sensor_sleep_max_time = 0;
+#endif
 
 // Device will be sending Sensor Status and LC Client messages.  It can also receive
 // On/Off publication from the bulbs.
@@ -316,7 +328,7 @@ void mesh_app_init(wiced_bool_t is_provisioned)
     wiced_bt_mesh_core_set_trace_level(WICED_BT_MESH_CORE_TRACE_FID_ALL, WICED_BT_MESH_CORE_TRACE_DEBUG);
     wiced_bt_mesh_core_set_trace_level(WICED_BT_MESH_CORE_TRACE_FID_CORE_AES_CCM, WICED_BT_MESH_CORE_TRACE_INFO);
 #endif
-    wiced_result_t result;
+    wiced_result_t result = WICED_SUCCESS;
     wiced_bt_mesh_core_config_sensor_t *p_sensor;
 
 #if defined(LOW_POWER_NODE) && (LOW_POWER_NODE == 1)
@@ -367,7 +379,7 @@ void mesh_app_init(wiced_bool_t is_provisioned)
 
     mesh_switch_init(MESH_ONOFF_SWITCH_ELEMENT_INDEX, is_provisioned);
 
-#if defined (CYBT_213043_MESH)
+#if defined (CYBT_213043_MESH) || defined (CYBLE_343072_MESH)
     e93196_init(&e93196_usr_cfg, e93196_int_proc, NULL);
 #endif
 

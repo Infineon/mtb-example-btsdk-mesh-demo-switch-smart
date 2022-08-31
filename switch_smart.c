@@ -35,13 +35,13 @@
  *
  * This demo application shows an implementation of a motion sensor.
  * The app is based on the snip/mesh/mesh_sensor_server sample which
- * implements generic BLE Mesh Sensor Server model.
+ * implements generic LE Mesh Sensor Server model.
  *
  * Features demonstrated
  * - Configuring and receiving interrupts from the PIR motion sensor
- * - Publishing motion data over BLE mesh
+ * - Publishing motion data over LE mesh
  *
- * See chip specific readme.txt for more information about the BT SDK.
+ * See chip specific readme.txt for more information about the Bluetooth SDK.
  *
  * To demonstrate the app, work through the following steps.
  * 1. Build and download the application to 213043 mesh kit.
@@ -80,7 +80,6 @@ extern wiced_bt_cfg_settings_t wiced_bt_cfg_settings;
  ******************************************************/
 #define MESH_PID                0x3123
 #define MESH_VID                0x0001
-#define MESH_CACHE_REPLAY_SIZE  0x0008
 
 #define MESH_SENSOR_PROPERTY_ID                         WICED_BT_MESH_PROPERTY_PRESENCE_DETECTED
 #define MESH_SENSOR_VALUE_LEN                           WICED_BT_MESH_PROPERTY_LEN_PRESENCE_DETECTED
@@ -135,9 +134,9 @@ static void         mesh_app_factory_reset(void);
 
 static void         mesh_sensor_server_restart_timer(wiced_bt_mesh_core_config_sensor_t *p_sensor);
 static void         mesh_sensor_server_report_handler(uint16_t event, uint8_t element_idx, void *p_get_data, void *p_ref_data);
-static void         mesh_sensor_server_config_change_handler(uint8_t element_idx, uint16_t event, uint16_t property_id, uint16_t setting_property_id);
-static void         mesh_sensor_server_process_cadence_changed(uint8_t element_idx, uint16_t property_id);
-static void         mesh_sensor_server_process_setting_changed(uint8_t element_idx, uint16_t property_id, uint16_t setting_property_id);
+static void         mesh_sensor_server_config_change_handler(uint8_t element_idx, uint16_t event, void* p_data);
+static void         mesh_sensor_server_process_cadence_changed(uint8_t element_idx, wiced_bt_mesh_sensor_cadence_status_data_t* p_data);
+static void         mesh_sensor_server_process_setting_changed(uint8_t element_idx, wiced_bt_mesh_sensor_setting_status_data_t* p_data);
 static void         mesh_sensor_publish_timer_callback(TIMER_PARAM_TYPE arg);
 static void         e93196_int_proc(void *data, uint8_t port_pin);
 static void         mesh_sensor_presence_detected_timer_callback(TIMER_PARAM_TYPE arg);
@@ -258,7 +257,6 @@ wiced_bt_mesh_core_config_t  mesh_config =
     .company_id         = MESH_COMPANY_ID_CYPRESS,                  // Company identifier assigned by the Bluetooth SIG
     .product_id         = MESH_PID,                                 // Vendor-assigned product identifier
     .vendor_id          = MESH_VID,                                 // Vendor-assigned product version identifier
-    .replay_cache_size  = MESH_CACHE_REPLAY_SIZE,                   // Number of replay protection entries, i.e. maximum number of mesh devices that can send application messages to this device.
 #if defined(LOW_POWER_NODE) && (LOW_POWER_NODE == 1)
     .features           = WICED_BT_MESH_CORE_FEATURE_BIT_LOW_POWER, // A bit field indicating the device features. In Low Power mode no Relay, no Proxy and no Friend
     .friend_cfg         =                                           // Empty Configuration of the Friend Feature
@@ -484,19 +482,18 @@ void mesh_onoff_client_message_handler(uint16_t event, wiced_bt_mesh_event_t *p_
 /*
  * Process the configuration changes set by the Sensor Client.
  */
-//void mesh_sensor_server_config_change_handler(uint8_t element_idx, uint16_t event, void *p_data)
-void mesh_sensor_server_config_change_handler(uint8_t element_idx, uint16_t event, uint16_t property_id, uint16_t setting_property_id)
+void mesh_sensor_server_config_change_handler(uint8_t element_idx, uint16_t event, void *p_data)
 {
     WICED_BT_TRACE("mesh_sensor_server_config_change_handler msg: %d\n", event);
 
     switch (event)
     {
-    case WICED_BT_MESH_SENSOR_CADENCE_SET:
-        mesh_sensor_server_process_cadence_changed(element_idx, property_id);
+    case WICED_BT_MESH_SENSOR_CADENCE_STATUS:
+        mesh_sensor_server_process_cadence_changed(element_idx, (wiced_bt_mesh_sensor_cadence_status_data_t*) p_data);
         break;
 
-    case WICED_BT_MESH_SENSOR_SETTING_SET:
-        mesh_sensor_server_process_setting_changed(element_idx, property_id, setting_property_id);
+    case WICED_BT_MESH_SENSOR_SETTING_STATUS:
+        mesh_sensor_server_process_setting_changed(element_idx, (wiced_bt_mesh_sensor_setting_status_data_t*) p_data);
         break;
     }
 }
@@ -532,14 +529,14 @@ void mesh_sensor_server_report_handler(uint16_t event, uint8_t element_idx, void
 /*
  * Process cadence change
  */
-void mesh_sensor_server_process_cadence_changed(uint8_t element_idx, uint16_t property_id)
+void mesh_sensor_server_process_cadence_changed(uint8_t element_idx, wiced_bt_mesh_sensor_cadence_status_data_t* p_data)
 {
     wiced_bt_mesh_core_config_sensor_t *p_sensor;
     uint8_t written_byte = 0;
     wiced_result_t status;
     p_sensor = &mesh_config.elements[element_idx].sensors[MESH_MOTION_SENSOR_INDEX];
 
-    WICED_BT_TRACE("cadence changed property id:%04x\n", property_id);
+    WICED_BT_TRACE("cadence changed property id:%04x\n", p_data->property_id);
     WICED_BT_TRACE("Fast cadence period divisor:%d\n", p_sensor->cadence.fast_cadence_period_divisor);
     WICED_BT_TRACE("Is trigger type percent:%d\n", p_sensor->cadence.trigger_type_percentage);
     WICED_BT_TRACE("Trigger delta up:%d\n", p_sensor->cadence.trigger_delta_up);
@@ -669,9 +666,9 @@ void mesh_sensor_publish_timer_callback(TIMER_PARAM_TYPE arg)
 /*
  * Process setting change
  */
-void mesh_sensor_server_process_setting_changed(uint8_t element_idx, uint16_t property_id, uint16_t setting_property_id)
+void mesh_sensor_server_process_setting_changed(uint8_t element_idx, wiced_bt_mesh_sensor_setting_status_data_t* p_data)
 {
-    WICED_BT_TRACE("settings changed sensor prop id:%x, setting prop id:%x\n", property_id, setting_property_id);
+    WICED_BT_TRACE("settings changed sensor prop id:%x, setting prop id:%x\n", p_data->property_id, p_data->setting.setting_property_id);
 }
 
 void e93196_int_proc(void* data, uint8_t port_pin)
